@@ -153,7 +153,7 @@ def masking(**kwargs):
 			#print 'smooth		 : smooth the continuum [y,n]'
 			print 'funcType     : change the interpolating function'
 			print 'write        : write updated spectrum to file.'
-			print 'regions		: display the regions you have masked already.'
+			print 'regions      : display the regions you have masked already.'
 			print 'commands     : display these commands again.'
 			print '--------------------------------------------------------------------'
 		elif user_input=='mask':
@@ -253,7 +253,7 @@ def masking(**kwargs):
 			print '--------------------------------------------------------------------'
 			outfile=open(rootname+'.bpm.'+suffix,'w')
 			for i in range(len(lam)):
-				outfile.write(str(lam[i])+' '+str(flux[i])+' '+str(flux_err[i])+'\n')
+				outfile.write(str(lam[i]*(1.+zem))+' '+str(flux[i])+' '+str(flux_err[i])+'\n')
 			outfile.close()
 			print 'New ASCII table written to file:'+rootname+'.bpm.'+suffix
 			print 'NB: - Whatever is currently on the plot will be written to-file'
