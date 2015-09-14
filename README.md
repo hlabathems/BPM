@@ -11,14 +11,17 @@ This is an program designed to interpolate out bad pixels or cosmic rays of a sp
 
 $> ./badPixelMasker.py -h
 
-usage: badPixelMasker.py [-h] spec
+usage: badPixelMasker.py [-h] [-zem ZEM] [-kind KIND] spec
 
 positional arguments:
   spec        /path/to/normalized/ASCII/spectrum
 
 optional arguments:
   -h, --help  show this help message and exit
-
+  -zem ZEM    redshift of target (If provided, will assume you want to shift
+              to rest-frame).
+  -kind KIND  Type of interpolation. i.e., linear, nearest, zero, slinear,
+              quadratic, cubic. See: scipy.interpolate.interp1d.html
 
 ###Outputs:
 The program doesn't necessarily output anything. However, the user can opt to output an updated version of the input spectrum. It will be given the filename:

@@ -12,13 +12,17 @@ FOR HELP:
 
 $> ./badPixelMasker.py -h
 
-usage: badPixelMasker.py [-h] spec
+usage: badPixelMasker.py [-h] [-zem ZEM] [-kind KIND] spec
 
 positional arguments:
   spec        /path/to/normalized/ASCII/spectrum
 
 optional arguments:
   -h, --help  show this help message and exit
+  -zem ZEM    redshift of target (If provided, will assume you want to shift
+              to rest-frame).
+  -kind KIND  Type of interpolation. i.e., linear, nearest, zero, slinear,
+              quadratic, cubic. See: scipy.interpolate.interp1d.html
 
 OUTPUTS:
 ----------
@@ -28,7 +32,7 @@ output an updated version of the input spectrum. It will be given the filename:
 $> filename.bpm.ascii
 
 wherein 'bpm' stands for Bad Pixel Masker. The output file will be exactly the
-same as the input file except the flux values in wavelength range(s) given
+same as the input file exce:pt the flux values in wavelength range(s) given
 during the masking process will have been changed.
 
 NOTES:
@@ -46,6 +50,10 @@ HISTORY
 				 - the user has the ability to add/remove masked regions on the
 				   fly, as well as write the new spectrum to file at anytime.
 2015-09-05 - JAR - original commit to github.com/jesserogerson
+2015-09-10 - JAR - added while loop to masking routine. asks users to confirm
+				   the mask they just applied. Makes it easy to try different
+				   masks quickly.
+2015-09-14 - JAR - Will de-redshift the given spectrum if a zem is provided
 --------------------------------------------------------------------------------
 '''
 import numpy as np
@@ -94,9 +102,8 @@ def masking(**kwargs):
 		print '-----...Exiting entire program'
 		sys.exit()
 
-	#Decided against transferring back/forth from rest to observed
-	#but can still add this functionality if wanted later.
-	#spectrum[:,0]=spectrum[:,0]/(1.+zem)
+	#Will shift into rest-frame if a zem is provided
+	spectrum[:,0]=spectrum[:,0]/(1.+zem)
 
 	#make a deep copy of the spectrum before going into loop
 	#NEVER change 'spectrum', ... only change the copies
@@ -141,59 +148,76 @@ def masking(**kwargs):
 			print 'You can mask out various regions of the spectra you input'
 			print 'by using the commands below.'
 			print ''
-			print 'q,Q            : to quit the Bad Pixel Masker'
-			print 'mask           : mask a region'
-			#print 'smooth         : smooth the continuum [y,n]'
-			print 'funcType       : change the interpolating function'
-			print 'write          : write updated spectrum to file.'
-			print 'regions        : display the regions you have masked already.'
-			print 'commands       : display these commands again.'
+			print 'q,Q          : to quit the Bad Pixel Masker'
+			print 'mask         : mask a region'
+			#print 'smooth		 : smooth the continuum [y,n]'
+			print 'funcType     : change the interpolating function'
+			print 'write        : write updated spectrum to file.'
+			print 'regions		: display the regions you have masked already.'
+			print 'commands     : display these commands again.'
 			print '--------------------------------------------------------------------'
 		elif user_input=='mask':
-			print '--------------------------------------------------------------------'
-			#Step1: ask user to locate the bad pixel
-			print 'INSTRUCT: Use the figure to determine the location of the bad pixels.'
-			user_input=raw_input('Enter wavelength range of bad pixel(s) (comma separated): ')
-			region=map(float,user_input.split(','))
-			print 'Region of bad pixels:'+str(region)
-			#find the indexes that correspond to the wavelength limits
-			bad_indexes=[index for index,value in enumerate(lam) if value >= region[0] and value <= region[1]]
-			xlow=bad_indexes[0]
-			xhigh=bad_indexes[-1]
-			user_input=raw_input('Enter size of window to use either side of bad region: ')
-			rad=int(user_input)+1
-			print '------------------------------------------------------------'
-			print 'Wavelength region of bad pixels selected:'+str(region)
-			print 'This corresponds to indexes: '+str(xlow)+' to '+str(xhigh)
-			print 'Chose to interpolate using',(rad-1),'pixels on either side of the bad region.'
-			print 'Interpolating using indexes:     '+str(xlow-rad)+' to '+str(xlow-1)
-			print '                                 '+str(xhigh+1)+' to '+str(xhigh+rad)
-			print 'Corresponding wavelength region: '+str(lam[xlow-rad])+' to '+str(lam[xlow-1])
-			print '                                 '+str(lam[xhigh+1])+' to '+str(lam[xhigh+rad])
-			print '...........................masking..........................'
-			print '------------------------------------------------------------'
-			#pull out the 'bad pixels'
-			lam_bad=lam[xlow:xhigh+1]
-			flux_bad=flux[xlow:xhigh+1]
-			flux_err_bad=flux_err[xlow:xhigh+1]
-			#Step2: calculate the interpolation function
-			xnew=np.concatenate((lam[(xlow-rad):(xlow-1)],lam[(xhigh+1):(xhigh+rad)]))
-			ynew=np.concatenate((flux[(xlow-rad):(xlow-1)],flux[(xhigh+1):(xhigh+rad)]))
-			ynewerr=np.concatenate((flux_err[(xlow-rad):(xlow-1)],flux_err[(xhigh+1):(xhigh+rad)]))
-			#fit a linear function, interpolate (1 dimensionally)
-			f=interp1d(xnew,ynew, kind=interpFunction)
-			#replace the values of flux with the new ones.
-			for i in range(len(lam)):
-				if i>=xlow and i<=xhigh:
-					print lam_bad[i-xlow],flux_bad[i-xlow],'-->',f(lam_bad[i-xlow])
-					flux[i]=f(lam_bad[i-xlow])
-			regionDict[count]=[region[0],region[1]]
-			count+=1
-			#reset the graph, so the user can look
-			graph.set_ydata(flux)
-			scat.remove()
-			scat=plt.scatter(lam,flux,s=10)
-			plt.pause(0.01)
+			ans=False
+			while ans==False:
+				print '--------------------------------------------------------------------'
+				#Step1: ask user to locate the bad pixel
+				print 'INSTRUCT: Use the figure to determine the location of the bad pixels.'
+				user_input=raw_input('Enter wavelength range of bad pixel(s) (comma separated): ')
+				region=map(float,user_input.split(','))
+				print 'Region of bad pixels:'+str(region)
+				#find the indexes that correspond to the wavelength limits
+				bad_indexes=[index for index,value in enumerate(lam) if value >= region[0] and value <= region[1]]
+				xlow=bad_indexes[0]
+				xhigh=bad_indexes[-1]
+				user_input=raw_input('Enter size of window to use either side of bad region: ')
+				rad=int(user_input)+1
+				print '------------------------------------------------------------'
+				print 'Wavelength region of bad pixels selected:'+str(region)
+				print 'This corresponds to indexes: '+str(xlow)+' to '+str(xhigh)
+				print 'Chose to interpolate using',(rad-1),'pixels on either side of the bad region.'
+				print 'Interpolating using indexes:  '+str(xlow-rad)+' to '+str(xlow-1)
+				print '                              '+str(xhigh+1)+' to '+str(xhigh+rad)
+				print 'Corresponding wavelength region: '+str(lam[xlow-rad])+' to '+str(lam[xlow-1])
+				print '                                 '+str(lam[xhigh+1])+' to '+str(lam[xhigh+rad])
+				print '...........................masking..........................'
+				print '------------------------------------------------------------'
+				#pull out the 'bad pixels'
+				lam_bad=lam[xlow:xhigh+1]
+				flux_bad=flux[xlow:xhigh+1]
+				flux_err_bad=flux_err[xlow:xhigh+1]
+				#Step2: calculate the interpolation function
+				xnew=np.concatenate((lam[(xlow-rad):(xlow-1)],lam[(xhigh+1):(xhigh+rad)]))
+				ynew=np.concatenate((flux[(xlow-rad):(xlow-1)],flux[(xhigh+1):(xhigh+rad)]))
+				ynewerr=np.concatenate((flux_err[(xlow-rad):(xlow-1)],flux_err[(xhigh+1):(xhigh+rad)]))
+				#fit a linear function, interpolate (1 dimensionally)
+				f=interp1d(xnew,ynew, kind=interpFunction)
+				#replace the values of flux with the new ones.
+				for i in range(len(lam)):
+					if i>=xlow and i<=xhigh:
+						print lam_bad[i-xlow],flux_bad[i-xlow],'-->',f(lam_bad[i-xlow])
+						flux[i]=f(lam_bad[i-xlow])
+				#reset the graph, so the user can look
+				graph.set_ydata(flux)
+				scat.remove()
+				scat=plt.scatter(lam,flux,s=10)
+				plt.pause(0.01)
+				user_input=raw_input('Do you want to keep these changes? [y/n]:')
+				if user_input in yes:
+					print 'Keeping mask, back to command page.'
+					ans=True
+					regionDict[count]=[region[0],region[1]]
+					count+=1
+				else:
+					if user_input not in no:
+						print 'Thats not an answer, removing the mask anyway.'
+					for i in range(len(lam)):
+						if i>=xlow and i<=xhigh:
+							print lam[i],flux[i],'-->',spectrum[i,1]
+							flux[i]=cp.deepcopy(spectrum[i,1])
+					graph.set_ydata(flux)
+					scat.remove()
+					scat=plt.scatter(lam,flux,s=10)
+					plt.pause(0.01)
 			print '--------------------------------------------------------------------'
 		elif user_input=='smooth':
 			print '--------------------------------------------------------------------'
@@ -232,8 +256,8 @@ def masking(**kwargs):
 				outfile.write(str(lam[i])+' '+str(flux[i])+' '+str(flux_err[i])+'\n')
 			outfile.close()
 			print 'New ASCII table written to file:'+rootname+'.bpm.'+suffix
-			print 'NB:  - Whatever is currently on the plot will be written to-file'
-			print '     - bpm --> bad pixel mask'
+			print 'NB: - Whatever is currently on the plot will be written to-file'
+			print '    - bpm --> bad pixel mask'
 			print 'Do with this file what you will!'
 			print '--------------------------------------------------------------------'
 		elif user_input=='regions':
@@ -261,7 +285,6 @@ def masking(**kwargs):
 					scat.remove()
 					scat=plt.scatter(lam,flux,s=10)
 					plt.pause(0.01)
-					ans=True
 				elif key not in regionDict.keys():
 					print 'Could not remove',key,'. It does not exist.'
 			elif user_input in no:
@@ -278,11 +301,11 @@ def masking(**kwargs):
 
 
 def smoothBoxCar(x,N=5):
-    '''
-    BoxCar smoothing function, optional
-    '''
-    boxcar=np.ones(N)
-    return convolve(x, boxcar/boxcar.sum())
+	'''
+	BoxCar smoothing function, optional
+	'''
+	boxcar=np.ones(N)
+	return convolve(x, boxcar/boxcar.sum())
 #------------------------------------------------------------------------------#
 
 #
@@ -291,7 +314,7 @@ def smoothBoxCar(x,N=5):
 #read in from command line
 parser=argparse.ArgumentParser()
 parser.add_argument('spec', type=str, help='/path/to/normalized/ASCII/spectrum')
-#parser.add_argument('-zem', type=float, default=0.0, help='redshift of target')
+parser.add_argument('-zem', type=float, default=0.0, help='redshift of target (If provided, will assume you want to shift to rest-frame).')
 #parser.add_argument('-fig', type=str, default='spec_BPM.eps', help='The name of the output plot (default spec_BPM.eps)')
 parser.add_argument('-kind', type=str, default='linear', help='Type of interpolation. i.e., linear, nearest, zero, slinear, quadratic, cubic. See: scipy.interpolate.interp1d.html')
 
