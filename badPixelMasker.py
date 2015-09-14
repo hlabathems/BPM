@@ -75,7 +75,7 @@ def masking(**kwargs):
 	as per the user's instructions
 	'''
 	filename=kwargs['spec']
-	#zem=kwargs['zem']
+	zem=kwargs['zem']
 	#smoothVal=kwargs['kind']
 	interpFunction=kwargs['kind']
 
