@@ -112,7 +112,7 @@ def masking(**kwargs):
 	flux_err=cp.deepcopy(spectrum[:,2])
 
 	#Make a plot of the spctrum to interact with
-	plt.rc('text',usetex=True)
+	#plt.rc('text',usetex=True)
 	plt.rc('font',family='sans-serif')
 	plt.ion()
 	graph=plt.plot(lam,flux,'k')[0]
